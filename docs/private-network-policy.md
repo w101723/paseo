@@ -67,3 +67,21 @@ Check daemon startup logs, capture DNS/TCP traffic from desktop and mobile build
 and independently block `paseo.sh` and its subdomains at your egress firewall.
 A static source change cannot prove absolute absence of traffic from arbitrary
 plugins, model SDKs, Electron/Expo frameworks, or agent-initiated commands.
+
+## Automatic desktop installers (branch `no-relay`)
+
+Every push to `no-relay` triggers `.github/workflows/no-relay-desktop.yml`.
+The workflow runs two independent jobs:
+
+- **macOS ARM64:** builds an Apple Silicon `.dmg` using electron-builder's `dmg` target.
+- **Windows AMD64/x64:** builds an NSIS `.exe` installer.
+
+Find each run under **Actions → Private Desktop Installers (no-relay)** and
+expand the **Artifacts** section to download `Paseo-no-relay-macos-arm64`
+or `Paseo-no-relay-windows-amd64` (retained for 30 days).
+You can also start a run manually using **Run workflow**.
+
+These are **unsigned** builds: macOS Gatekeeper and Windows SmartScreen may
+warn when opening them. A notarized/signed distribution requires signing
+credentials and an explicit future workflow change. The workflow never
+publishes to the Paseo organization's releases, npm registry, or Expo.

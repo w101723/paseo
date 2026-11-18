@@ -1,0 +1,95 @@
+name: Private Desktop Installers (no-relay)
+
+# Each push to the private-network branch produces downloadable installers.
+# Artifacts are stored in this Actions run; nothing is uploaded to upstream or Releases.
+on:
+  push:
+    branches:
+      - no-relay
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: no-relay-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-arm64:
+    name: macOS ARM64 DMG (unsigned)
+    runs-on: macos-latest
+    timeout-minutes: 120
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      PASEO_DESKTOP_SMOKE: "0"
+    steps:
+      - name: Checkout no-relay source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+          registry-url: https://npm.pkg.github.com
+          scope: "@boudra"
+
+      - name: Install dependencies
+        run: node scripts/npm-retry.mjs ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build macOS Apple Silicon DMG
+        # Disable notarization/signing in CI; no Apple Developer secrets required.
+        run: npm run build:desktop -- --publish never --mac dmg --arm64 -c.mac.notarize=false
+
+      - name: Upload ARM64 DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Paseo-no-relay-macos-arm64
+          path: packages/desktop/release/Paseo-*-arm64.dmg
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  windows-x64:
+    name: Windows AMD64 NSIS installer (unsigned)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      PASEO_DESKTOP_SMOKE: "0"
+    steps:
+      - name: Checkout no-relay source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+          registry-url: https://npm.pkg.github.com
+          scope: "@boudra"
+
+      - name: Install dependencies
+        run: node scripts/npm-retry.mjs ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Windows AMD64 NSIS installer
+        run: npm run build:desktop -- --publish never --win nsis --x64
+
+      - name: Upload x64 EXE installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Paseo-no-relay-windows-amd64
+          path: packages/desktop/release/Paseo-Setup-*-x64.exe
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
