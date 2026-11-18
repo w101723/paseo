@@ -20,6 +20,53 @@ describe("server config", () => {
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
+  test("private mode has no official relay, web origin, or plugin registry default", async () => {
+    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-private-default-"));
+    roots.push(paseoHome);
+    const config = loadConfig(paseoHome, { env: {} });
+    expect(config.relayEnabled).toBe(false);
+    expect(config.relayEndpoint).toBe("");
+    expect(config.pluginRegistryUrl).toBeUndefined();
+    expect(config.appBaseUrl).toBe("");
+    expect(config.corsAllowedOrigins).not.toContain("https://app.paseo.sh");
+    expect(config.relayRequireProtectedSecurity).toBe(true);
+  });
+
+  test("old official URLs are ignored or rejected, never used as fallbacks", () => {
+    const paseoHome = "/tmp/paseo-private-config-test";
+    const legacy = {
+      version: 1 as const,
+      daemon: {
+        relay: { enabled: false, endpoint: "relay.paseo.sh:443" },
+        cors: { allowedOrigins: ["https://app.paseo.sh"] },
+      },
+      app: { baseUrl: "https://app.paseo.sh" },
+    };
+    const config = resolveConfigFromPersisted(paseoHome, legacy, { env: {} });
+    expect(config.relayEnabled).toBe(false);
+    expect(config.appBaseUrl).toBe("");
+    expect(config.corsAllowedOrigins).toEqual([]);
+    expect(() => resolveConfigFromPersisted(paseoHome, {
+      ...legacy,
+      daemon: { ...legacy.daemon, relay: { ...legacy.daemon.relay, enabled: true } },
+    }, { env: {} })).toThrow(/Private network policy/);
+    expect(() => resolveConfigFromPersisted(paseoHome, {
+      version: 1,
+      daemon: { relay: { enabled: true } },
+    }, { env: {} })).toThrow(/explicit daemon.relay.endpoint/);
+  });
+
+  test("explicit self-hosted relay is accepted and defaults to protected WSS", () => {
+    const config = resolveConfigFromPersisted("/tmp/paseo-private-selfhost-test", {
+      version: 1,
+      daemon: { relay: { enabled: true, endpoint: "relay.example.net:443" } },
+    }, { env: {} });
+    expect(config.relayEnabled).toBe(true);
+    expect(config.relayEndpoint).toBe("relay.example.net:443");
+    expect(config.relayUseTls).toBe(true);
+    expect(config.relayRequireProtectedSecurity).toBe(true);
+  });
+
   test("resolves reloadable settings without resolving the startup password", async () => {
     const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-config-auth-reload-"));
     roots.push(paseoHome);

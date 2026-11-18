@@ -244,8 +244,6 @@ const appUpdateService = createAppUpdateService({
 
 export async function checkForAppUpdate({
   currentVersion,
-  releaseChannel,
-  intent,
 }: {
   currentVersion: string;
   releaseChannel: AppReleaseChannel;
@@ -293,35 +291,24 @@ export async function checkForAppUpdateLegacy({
 */
 
 export async function downloadAndInstallUpdate(
-  {
-    currentVersion,
-    releaseChannel,
-  }: {
+  { currentVersion }: {
     currentVersion: string;
     releaseChannel: AppReleaseChannel;
   },
-  onBeforeQuit?: () => Promise<void>,
+  _onBeforeQuit?: () => Promise<void>,
 ): Promise<AppUpdateInstallResult> {
-  return { installed: false, version: currentVersion, message: "App updates disabled by private network policy" };
+  return {
+    installed: false,
+    version: currentVersion,
+    message: "App updates disabled by private network policy",
+  };
 }
 
-export async function installAppUpdateOnQuit({
-  currentVersion,
-  releaseChannel,
-  signal,
-}: {
+export async function installAppUpdateOnQuit(_input: {
   currentVersion: string;
   releaseChannel: AppReleaseChannel;
   signal: AbortSignal;
 }): Promise<boolean> {
-  if (
-    !shouldInstallAppUpdateOnQuit({
-      platform: process.platform,
-      isAppImage: Boolean(process.env.APPIMAGE),
-    })
-  ) {
-    return false;
-  }
-
-  return false; // Never auto-install an upstream release.
+  // Never auto-install an upstream release.
+  return false;
 }
