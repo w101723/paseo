@@ -251,6 +251,28 @@ export async function checkForAppUpdate({
   releaseChannel: AppReleaseChannel;
   intent: AppUpdateCheckIntent;
 }): Promise<AppUpdateCheckResult> {
+  // No updater calls (including manual checks) in private builds.
+  return {
+    hasUpdate: false,
+    readyToInstall: false,
+    currentVersion,
+    latestVersion: currentVersion,
+    body: null,
+    date: null,
+    errorMessage: "App updates are disabled by private network policy",
+  };
+}
+
+/* Legacy updater implementation retained for potential future self-hosted release support.
+export async function checkForAppUpdateLegacy({
+  currentVersion,
+  releaseChannel,
+  intent,
+}: {
+  currentVersion: string;
+  releaseChannel: AppReleaseChannel;
+  intent: AppUpdateCheckIntent;
+}): Promise<AppUpdateCheckResult> {
   updateLifecycleLog.checkStarted({ currentVersion, releaseChannel, intent });
   const result = await appUpdateService.checkForAppUpdate({
     currentVersion,
@@ -268,6 +290,7 @@ export async function checkForAppUpdate({
   });
   return result;
 }
+*/
 
 export async function downloadAndInstallUpdate(
   {
@@ -279,10 +302,7 @@ export async function downloadAndInstallUpdate(
   },
   onBeforeQuit?: () => Promise<void>,
 ): Promise<AppUpdateInstallResult> {
-  return appUpdateService.downloadAndInstallUpdate(
-    { currentVersion, releaseChannel },
-    onBeforeQuit,
-  );
+  return { installed: false, version: currentVersion, message: "App updates disabled by private network policy" };
 }
 
 export async function installAppUpdateOnQuit({
@@ -303,5 +323,5 @@ export async function installAppUpdateOnQuit({
     return false;
   }
 
-  return appUpdateService.installUpdateOnQuit({ currentVersion, releaseChannel, signal });
+  return false; // Never auto-install an upstream release.
 }

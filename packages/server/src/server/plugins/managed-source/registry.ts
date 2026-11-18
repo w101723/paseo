@@ -11,6 +11,7 @@ import {
 } from "@getpaseo/protocol/plugin-registry";
 import type { PluginUpdateTarget } from "@getpaseo/protocol/messages";
 import { z } from "zod";
+import { assertPrivateServiceEndpoint } from "@getpaseo/protocol/network-policy";
 
 // Install reads only these fields; the rest of a published plugin is the directory's display data.
 const RegistryInstallDocumentSchema = z.object({
@@ -24,6 +25,7 @@ export interface RegistryOptions {
 }
 /** Request headers for a registry, with its configured credentials. Rejects unsafe bases. */
 function registryHeaders(url: string, options: RegistryOptions): Record<string, string> {
+  assertPrivateServiceEndpoint(url, "plugin registry");
   const base = new URL(url);
   if (!["http:", "https:"].includes(base.protocol) || base.username || base.password)
     throw new Error("Registry base must be an HTTP(S) URL without credentials");
@@ -38,7 +40,10 @@ function registryHeaders(url: string, options: RegistryOptions): Record<string, 
 }
 
 function defaultRegistryUrl(options: RegistryOptions): string {
-  return (options.defaultUrl ?? DEFAULT_PLUGIN_REGISTRY_URL).replace(/\/+$/, "");
+  const url = (options.defaultUrl ?? DEFAULT_PLUGIN_REGISTRY_URL).trim().replace(/\/+$/, "");
+  if (!url) throw new Error("Private network policy: configure PASEO_PLUGIN_REGISTRY to use a self-hosted registry");
+  assertPrivateServiceEndpoint(url, "plugin registry");
+  return url;
 }
 
 /** Reads a display document from the default registry; never used to choose what installs. */

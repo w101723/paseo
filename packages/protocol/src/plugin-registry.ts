@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { assertPrivateServiceEndpoint } from "./network-policy.js";
 
 export const PluginRegistryIdSchema = z
   .string()
@@ -111,19 +112,24 @@ export type PublishedPlugin = z.infer<typeof PublishedPluginSchema>;
 export type PublishedPluginDetail = z.infer<typeof PublishedPluginDetailSchema>;
 export type PluginRegistryIndex = z.infer<typeof PluginRegistryIndexSchema>;
 
-export const DEFAULT_PLUGIN_REGISTRY_URL = "https://plugins.paseo.sh";
+// A registry must be explicitly configured; never default to the official service.
+export const DEFAULT_PLUGIN_REGISTRY_URL = "";
 
 export function parsePluginRegistryReference(
   source: string,
   defaultUrl = DEFAULT_PLUGIN_REGISTRY_URL,
 ): PluginRegistryIdentity | null {
   const segments = source.split("/");
-  if (segments.length === 2 && PluginRegistryIdSchema.safeParse(source).success)
+  if (segments.length === 2 && PluginRegistryIdSchema.safeParse(source).success) {
+    if (!defaultUrl.trim()) return null;
+    assertPrivateServiceEndpoint(defaultUrl, "plugin registry");
     return { url: defaultUrl.replace(/\/+$/, ""), id: source };
+  }
   const [host, ...rest] = segments;
   if (segments.length !== 3 || !host || !/[.:]/.test(host) || /[@?#\\]/.test(host)) return null;
   const id = rest.join("/");
   if (!PluginRegistryIdSchema.safeParse(id).success) return null;
   const url = new URL(`https://${host}`);
+  assertPrivateServiceEndpoint(url.origin, "plugin registry");
   return { url: url.origin, id };
 }

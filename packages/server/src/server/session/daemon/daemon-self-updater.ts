@@ -53,6 +53,11 @@ export class DaemonSelfUpdater {
   constructor(private readonly runtime: DaemonSelfUpdateRuntime = defaultRuntime) {}
 
   async update(input: DaemonSelfUpdateInput): Promise<DaemonSelfUpdateResult> {
+    // Upstream npm packages are not an authorized update channel in private mode.
+    return { success: false, error: "Self-update disabled by private network policy", newVersion: null };
+  }
+
+  private async updateFromOfficialRegistry(input: DaemonSelfUpdateInput): Promise<DaemonSelfUpdateResult> {
     if (input.desktopManaged) {
       return { success: false, error: DESKTOP_MANAGED_UPDATE_ERROR, newVersion: null };
     }

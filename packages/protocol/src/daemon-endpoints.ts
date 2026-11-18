@@ -1,4 +1,5 @@
 import type { ConnectionOfferV2 } from "./connection-offer.js";
+import { assertPrivateServiceEndpoint } from "./network-policy.js";
 
 export interface HostPortParts {
   host: string;
@@ -41,6 +42,7 @@ export function parseRelayConnectionUri(input: string): ParsedRelayConnectionUri
     throw new Error("Relay connection URI requires a server id and key");
   }
   const endpoint = normalizeHostPort(url.host);
+  assertPrivateServiceEndpoint(endpoint, "relay");
   const password = url.searchParams.get("password") || undefined;
   const security = url.searchParams.get("security");
   if (security !== null && security !== "protected") {
@@ -59,6 +61,7 @@ export function parseRelayConnectionUri(input: string): ParsedRelayConnectionUri
 }
 
 export function serializeRelayConnectionUri(parts: ParsedRelayConnectionUri): string {
+  assertPrivateServiceEndpoint(parts.offer.relay.endpoint, "relay");
   const url = new URL(
     `relay://${parts.offer.relay.endpoint}/${encodeURIComponent(parts.offer.serverId)}`,
   );
@@ -75,7 +78,8 @@ export type RelayRole = "server" | "client";
 export type RelayProtocolVersion = "1" | "2";
 
 export const CURRENT_RELAY_PROTOCOL_VERSION: RelayProtocolVersion = "2";
-export const DEFAULT_RELAY_ENDPOINT = "relay.paseo.sh:443";
+// No implicit official relay in the private fork.
+export const DEFAULT_RELAY_ENDPOINT = "";
 
 export function normalizeRelayProtocolVersion(
   value: unknown,
@@ -226,6 +230,7 @@ export interface WebSocketUrlOptions {
 }
 
 export function buildDaemonWebSocketUrl(endpoint: string, opts: WebSocketUrlOptions): string {
+  assertPrivateServiceEndpoint(endpoint, "direct daemon");
   const { host, port, isIpv6 } = parseHostPort(endpoint);
   const protocol = opts.useTls ? "wss" : "ws";
   const hostPart = isIpv6 ? `[${host}]` : host;
@@ -244,6 +249,7 @@ export function buildRelayWebSocketUrl(params: {
   connectionId?: string;
   version?: RelayProtocolVersion | 1 | 2;
 }): string {
+  assertPrivateServiceEndpoint(params.endpoint, "relay");
   const { host, port, isIpv6 } = parseHostPort(params.endpoint);
   const protocol = params.useTls ? "wss" : "ws";
   const hostPart = isIpv6 ? `[${host}]` : host;

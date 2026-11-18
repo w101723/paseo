@@ -240,6 +240,9 @@ export const PersistedConfigSchema = z
     // v1 schema marker
     version: z.literal(1).optional(),
 
+    // Private, fail-closed fork network policy (no official-service opt-in).
+    network: z.object({ mode: z.literal("private").optional() }).strict().optional(),
+
     // v1 config layout
     daemon: z
       .object({
@@ -381,17 +384,16 @@ export type PersistedConfig = Omit<PersistedConfigSchemaOutput, "agents"> & {
 const CONFIG_FILENAME = "config.json";
 const DEFAULT_PERSISTED_CONFIG = PersistedConfigSchema.parse({
   version: 1,
+  network: { mode: "private" },
   daemon: {
     listen: "127.0.0.1:6767",
     cors: {
-      allowedOrigins: ["https://app.paseo.sh"],
+      allowedOrigins: [],
     },
     relay: {
       enabled: false,
+      requireProtectedSecurity: true,
     },
-  },
-  app: {
-    baseUrl: "https://app.paseo.sh",
   },
 }) as PersistedConfig;
 

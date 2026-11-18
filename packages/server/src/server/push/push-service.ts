@@ -1,4 +1,5 @@
 import type pino from "pino";
+import { PRIVATE_NETWORK_POLICY } from "@getpaseo/protocol/network-policy";
 
 export interface PushPayload {
   title: string;
@@ -38,6 +39,8 @@ export class PushService {
   }
 
   async sendPush(tokens: string[], payload: PushPayload): Promise<void> {
+    // Fork privacy policy: never transmit message content or tokens to Expo.
+    if (!PRIVATE_NETWORK_POLICY.expoPush) return;
     if (tokens.length === 0) {
       return;
     }

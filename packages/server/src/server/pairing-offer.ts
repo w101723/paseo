@@ -1,4 +1,6 @@
 import type { Logger } from "pino";
+import { serializeRelayConnectionUri } from "@getpaseo/protocol/daemon-endpoints";
+import { assertPrivateServiceEndpoint } from "@getpaseo/protocol/network-policy";
 
 import { createConnectionOfferV2, encodeOfferToFragmentUrl } from "./connection-offer.js";
 import { loadOrCreateDaemonKeyPair } from "./daemon-keypair.js";
@@ -24,7 +26,7 @@ export async function generateLocalPairingOffer(args: {
   includeQr?: boolean;
   logger?: Logger;
 }): Promise<LocalPairingOffer> {
-  const relayEnabled = args.relayEnabled ?? true;
+  const relayEnabled = args.relayEnabled ?? false;
   if (!relayEnabled) {
     return {
       relayEnabled: false,
@@ -33,11 +35,15 @@ export async function generateLocalPairingOffer(args: {
     };
   }
 
-  const relayEndpoint = args.relayEndpoint ?? "relay.paseo.sh:443";
-  const relayPublicEndpoint = args.relayPublicEndpoint ?? relayEndpoint;
-  const relayUseTls = args.relayUseTls ?? relayEndpoint === "relay.paseo.sh:443";
+  const relayEndpoint = args.relayEndpoint?.trim();
+  if (!relayEndpoint) throw new Error("Self-hosted relay endpoint is required for pairing");
+  const relayPublicEndpoint = args.relayPublicEndpoint?.trim() || relayEndpoint;
+  assertPrivateServiceEndpoint(relayEndpoint, "relay");
+  assertPrivateServiceEndpoint(relayPublicEndpoint, "public relay");
+  const relayUseTls = args.relayUseTls ?? true;
   const relayPublicUseTls = args.relayPublicUseTls ?? relayUseTls;
-  const appBaseUrl = args.appBaseUrl ?? "https://app.paseo.sh";
+  const appBaseUrl = args.appBaseUrl?.trim() ?? "";
+  if (appBaseUrl) assertPrivateServiceEndpoint(appBaseUrl, "pairing web app");
   const serverId = getOrCreateServerId(args.paseoHome, { logger: args.logger });
   const daemonKeyPair = await loadOrCreateDaemonKeyPair(args.paseoHome, args.logger);
   const offer = await createConnectionOfferV2({
@@ -48,7 +54,11 @@ export async function generateLocalPairingOffer(args: {
       ? { minimumSecurityMode: "protected" as const }
       : {}),
   });
-  const url = encodeOfferToFragmentUrl({ offer, appBaseUrl });
+  // relay:// links are supported directly by the client pairing parser; no hosted
+  // Paseo webpage or third-party JavaScript is needed to scan or paste the QR.
+  const url = appBaseUrl
+    ? encodeOfferToFragmentUrl({ offer, appBaseUrl })
+    : serializeRelayConnectionUri({ offer });
 
   if (args.includeQr === false) {
     return {

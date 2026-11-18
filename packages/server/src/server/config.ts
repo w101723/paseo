@@ -1,3 +1,4 @@
+import { assertPrivateServiceEndpoint, isOfficialPaseoEndpoint } from "@getpaseo/protocol/network-policy";
 import { configurationEnvironment } from "./config-environment.js";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -36,8 +37,8 @@ export {
 } from "./persisted-config.js";
 
 const DEFAULT_PORT = 6767;
-const DEFAULT_RELAY_ENDPOINT = "relay.paseo.sh:443";
-const DEFAULT_APP_BASE_URL = "https://app.paseo.sh";
+const DEFAULT_RELAY_ENDPOINT = "";
+const DEFAULT_APP_BASE_URL = "";
 const DEFAULT_TRUSTED_PROXIES = ["loopback"];
 
 interface ResolveBundledWebUiDistDirInput {
@@ -315,20 +316,26 @@ function resolveRelayEndpoints(input: ResolveRelayInput): {
 
 function resolveRelayConfig(input: ResolveRelayInput): ResolvedRelay {
   const environmentEnabled = parseBooleanEnv(input.env.PASEO_RELAY_ENABLED);
-  // COMPAT(relayOptInDefault): daemons whose startup config omitted this field
-  // retain relay-on removal semantics until 2027-01-31. Modern homes use false.
+  // Private mode: missing relay.enabled is always false, including legacy homes.
   const enabled =
     input.cliRelayEnabled ??
     environmentEnabled ??
     input.persisted.daemon?.relay?.enabled ??
-    input.enabledFallback;
+    false;
   const { endpoint, publicEndpoint } = resolveRelayEndpoints(input);
+  if (enabled) {
+    if (!endpoint.trim()) {
+      throw new Error("Private network policy: enable a relay only with an explicit daemon.relay.endpoint or PASEO_RELAY_ENDPOINT");
+    }
+    assertPrivateServiceEndpoint(endpoint, "relay");
+    assertPrivateServiceEndpoint(publicEndpoint, "public relay");
+  }
   const useTls =
     input.cliRelayUseTls ??
     resolveTlsFromEnv(
       input.env.PASEO_RELAY_USE_TLS,
       input.persisted.daemon?.relay?.useTls,
-      endpoint === DEFAULT_RELAY_ENDPOINT,
+      true, // Prefer WSS for explicitly configured self-hosted relays.
     );
   const publicUseTls = resolveTlsFromEnv(
     input.env.PASEO_RELAY_PUBLIC_USE_TLS,
@@ -338,7 +345,7 @@ function resolveRelayConfig(input: ResolveRelayInput): ResolvedRelay {
   return {
     enabled,
     enabledMutable: input.cliRelayEnabled === undefined && environmentEnabled === undefined,
-    requireProtectedSecurity: input.persisted.daemon?.relay?.requireProtectedSecurity ?? false,
+    requireProtectedSecurity: input.persisted.daemon?.relay?.requireProtectedSecurity ?? true,
     endpoint,
     publicEndpoint,
     useTls,
@@ -438,7 +445,7 @@ function resolveCorsAllowedOrigins(
     : [];
   const persistedCorsOrigins = persisted.daemon?.cors?.allowedOrigins ?? [];
   return Array.from(
-    new Set([...persistedCorsOrigins, ...envCorsOrigins].filter((s) => s.length > 0)),
+    new Set([...persistedCorsOrigins, ...envCorsOrigins].filter((s) => s.length > 0 && !isOfficialPaseoEndpoint(s))),
   );
 }
 
@@ -543,6 +550,14 @@ function resolveProfileLists(persisted: ReturnType<typeof loadPersistedConfig>) 
   };
 }
 
+function resolvePrivateAppBaseUrl(value: string): string {
+  // Existing Paseo installations persisted this exact official default.
+  // Ignore it safely instead of preventing the daemon from starting.
+  if (value.replace(/\/+$/, "") === "https://app.paseo.sh") return "";
+  if (value) assertPrivateServiceEndpoint(value, "pairing web app");
+  return value;
+}
+
 function resolveStaticLoadConfigSettings(
   env: NodeJS.ProcessEnv,
   cli: CliConfigOverrides | undefined,
@@ -563,7 +578,7 @@ function resolveStaticLoadConfigSettings(
       cli?.hostnames,
     ]),
     trustedProxies: resolveTrustedProxiesConfig(env, persisted),
-    appBaseUrl: env.PASEO_APP_BASE_URL ?? persisted.app?.baseUrl ?? DEFAULT_APP_BASE_URL,
+    appBaseUrl: resolvePrivateAppBaseUrl(env.PASEO_APP_BASE_URL ?? persisted.app?.baseUrl ?? DEFAULT_APP_BASE_URL),
   };
 }
 

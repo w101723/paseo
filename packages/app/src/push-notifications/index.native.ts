@@ -1,8 +1,9 @@
-import { revokeSubscription, startSubscription } from "./internal/subscriptions";
+import { revokeSubscription } from "./internal/subscriptions";
 import type { RevokePushNotificationsInput, StartPushNotificationsInput } from "./internal/types";
 
-export function startPushNotifications(input: StartPushNotificationsInput): () => void {
-  return startSubscription(input);
+export function startPushNotifications(_input: StartPushNotificationsInput): () => void {
+  // Private builds do not request Expo tokens or register push subscriptions.
+  return () => undefined;
 }
 
 export function revokePushNotifications(input: RevokePushNotificationsInput): Promise<void> {

@@ -19,6 +19,7 @@ import {
   HostAppearanceSchema,
 } from "@/hosts/appearance";
 import { z } from "zod";
+import { assertPrivateServiceEndpoint } from "@getpaseo/protocol/network-policy";
 
 export { DirectTcpHostConnectionSchema };
 export type DirectTcpHostConnection = Omit<WireDirectTcpHostConnection, "password">;
@@ -439,6 +440,7 @@ export function connectionFromListen(listen: string): HostConnection | null {
 }
 
 export function relayConnectionFromOffer(offer: ConnectionOffer): RelayHostConnection {
+  assertPrivateServiceEndpoint(offer.relay.endpoint, "imported relay pairing");
   // COMPAT(oldRelayOfferTls): added in v0.1.73, remove after 2026-11-10.
   const useTls = offer.relay.useTls ?? shouldUseTlsForDefaultHostedRelay(offer.relay.endpoint);
   const relayEndpoint = normalizeHostPort(offer.relay.endpoint);

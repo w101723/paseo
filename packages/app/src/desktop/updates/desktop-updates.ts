@@ -38,8 +38,6 @@ export interface LocalDaemonVersionResult {
   error: string | null;
 }
 
-const RELEASE_DOWNLOAD_BASE_URL = "https://github.com/getpaseo/paseo/releases/download";
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -188,13 +186,9 @@ export function formatVersionWithPrefix(version: string | null | undefined): str
   return value.startsWith("v") ? value : `v${value}`;
 }
 
-export function buildMacAppleSiliconDownloadUrl(version: string | null | undefined): string | null {
-  const normalizedVersion = normalizeVersionForComparison(version);
-  if (!normalizedVersion) {
-    return null;
-  }
-
-  return `${RELEASE_DOWNLOAD_BASE_URL}/v${normalizedVersion}/Paseo-${normalizedVersion}-arm64.dmg`;
+export function buildMacAppleSiliconDownloadUrl(_version: string | null | undefined): string | null {
+  // Do not expose a fallback link to upstream release assets.
+  return null;
 }
 
 export function buildDaemonUpdateDiagnostics(result: LocalDaemonUpdateResult): string {
